@@ -1,0 +1,7 @@
+.DS_Store
+.env*
+backups/
+cookies/*
+node_modules/
+scan_results/
+screenshots*
