@@ -1,115 +1,150 @@
-# Visual Check Cheat Sheet
+# Visual Regression Checker
 
-A lightweight visual regression checker using Puppeteer and Pixelmatch.
+This tool automates **screenshot capture** and **visual regression testing** for SaltEdge Connect templates using Puppeteer, with support for multiple environments, modes, themes, and cookie-based sessions.
 
 ---
+
+## Features
+
+- 🚀 Automated **screenshot capture** with Puppeteer.
+- 🖥️ Predefined device sizes (desktop, mobile320, mobile360, mobile414).
+- 🌐 Supports environments:
+  - localhost → http://localhost:5000
+  - staging → https://www.banksalt.com
+  - production → https://www.saltedge.com
+- 🍪 Cookies saved per environment (/cookies/{env}.json) to keep sessions alive.
+- 🎨 Theme support (--theme=light / dark).
+- 👥 Mode support: --mode=partner (default) or --mode=client.
+- 🖼️ Image diffing with pixelmatch.
+- ✅ Approval mode (--approve) to update baselines.
+- 🔍 Stops animations for consistent screenshots.
 
 
 ## Installation
 
 ```bash
-# Clone or go to project folder
+git clone <repo-url>
 cd visual-check
-
-# Install dependencies using Yarn
-yarn add puppeteer pngjs pixelmatch sharp chalk dotenv
+npm install
 ```
 
 ---
 
 
-### Environment Variables
+### Setup
 
-Create a `.env` file:
+1. Create an `.env` file in the project root:
 
 ```bash
 LOGIN_USER=your_username
 LOGIN_PASS=your_password
 ```
 
----
-
-
-### Basic usage
+2. Make sure you have a `cookies/` folder:
 
 ```bash
-node visual-check.js --connect_template=<template_name> --partner=<true|false>
+mkdir cookies
 ```
-
-- `--connect_template` (required) — template name (e.g., `partner_budgetbakers`)
-- `--partner` — `true` or `false` (decides which screens array to use)
-
----
-
-
-### Log in and cookies
 
 On first usage application will log in and record cookies, that will be valid for 12 hours.
 After 12 hours cookies should be removed for right the application working
 
+Cookies will be stored per environment (`cookies/localhost.json`, `cookies/staging.json`, `cookies/production.json`).
+
+---
+
+
+### Usage
+
+Run the tool with:
+
+```bash
+node visual-check.js --connect_template=<template> [options]
+```
+
 ---
 
 
-### Optional Flags
+### Options
 
-- `--screen=<screen_name>` — Run only a specific screen.
-- `--device=<device_name>` — Run only a specific device. Options:
-  - `desktop` (1440x900)
-  - `mobile320` (320x580)
-  - `mobile375` (360x768)
-  - `mobile414` (414x896)
-
-- `--show` — Show the browser window (headless = false).
-- `--approve` — Approve changes, update baseline with current screenshot.
-
----
+| Option                                       | Description                                                     |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `--connect_template=...`                     | (Required) Connect template name.                               |
+| `--mode=partner` / `client`                  | Mode for testing (default: `partner`).                          |
+| `--env=localhost` / `staging` / `production` | Target environment (default: `localhost`).                      |
+| `--screen=consent`                           | Run only a specific screen (default: all screens for the mode). |
+| `--device=mobile360`                         | Run only for a specific device (default: all devices).          |
+| `--theme=dark`                               | Theme selection (default: `light`).                             |
+| `--approve`                                  | Approve changes: update baseline and reset diff.                |
+| `--show`                                     | Run Puppeteer with visible browser window.                      |
 
 
 ### Examples
 
-Run all screens for a partner template:
+Run full check for `partner mode` in `localhost`:
 
 ```bash
-node visual-check.js --connect_template=partner_budgetbakers --partner=true
+node visual-check.js --connect_template=partner_default_fino
 ```
 
-Run only consent screen on `mobile375`:
+Run a single screen with specific device:
 
 ```bash
-node visual-check.js --connect_template=partner_budgetbakers --partner=true --screen=consent --device=mobile375
+node visual-check.js --connect_template=partner_default_fino --screen=consent --device=mobile360
+```
+
+Run in `staging environment` with dark theme:
+
+```bash
+node visual-check.js --connect_template=partner_default_fino --env=staging --theme=dark
 ```
 
 Show browser while running:
 
 ```bash
-node visual-check.js --connect_template=partner_budgetbakers --partner=true --show
+node visual-check.js --connect_template=partner_default_fino --partner=true --show
 ```
 
-Approve current screenshots as new baseline:
+Approve new baseline after design changes:
 
 ```bash
-node visual-check.js --connect_template=partner_budgetbakers --partner=true --approve
+node visual-check.js --connect_template=partner_default_fino --screen=consent --approve
 ```
 
 ---
 
 
-### Output
+### Outputs
 
-Screenshots saved in:
+Screenshots and diffs are stored under:
 
-`screenshots/<connect_template>/<screen>/<device>/`
-
-Files per folder:
-
-- `baseline.png` — reference image
-- `current.png` — latest screenshot
-- `diff.png` — highlights differences
-- Terminal outputs differences in **red**; no differences in **green**.
-- Summary of problematic screens displayed at the end.
+```
+screenshots/
+  └── <connect_template>/
+      └── <screen>/
+          └── <device>/
+              ├── baseline.png   # Approved baseline
+              ├── current.png    # Latest screenshot
+              └── diff.png       # Differences
+```
 
 ---
 
+### Workflow
+
+1. Run the script → compares current screenshots against baseline.
+2. If differences are detected → diff.png highlights mismatches.
+3. If design changes are valid → rerun with --approve to update baselines.
+4. Cookies are reused for 12h per environment.
+
+
+### Roadmap / Ideas
+
+- Support for batch testing multiple templates.
+- Slack/GitHub Actions integration for CI pipelines.
+- Enhanced reporting (HTML/PDF summary).
+
+---
 
 ### Tips:
 
