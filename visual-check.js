@@ -11,8 +11,8 @@ import sharp from "sharp";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Predefined screens for partner true/false
-const SCREENS_PARTNER_TRUE = [
+// Predefined screens for modes
+const PARTNER_SCREENS = [
   "search",
   "credentials",
   "provider_and_consent_skipped",
@@ -32,7 +32,7 @@ const SCREENS_PARTNER_TRUE = [
   "kyc_standard",
 ];
 
-const SCREENS_PARTNER_FALSE = [
+const CLIENT_SCREENS = [
   "search",
   "credentials",
   "provider_and_consent_skipped",
@@ -64,21 +64,23 @@ const ENV_URLS = {
   production: "https://www.saltedge.com"
 };
 
-// Default theme
-const DEFAULT_THEME = "light";
-
-const BASE_PATH = "/admin/previews/connect/frame?customization=off&locale=en&mode=all";
+const BASE_PATH = "/admin/previews/connect/frame?customization=off&locale=en";
 
 // Parse CLI arguments
 function parseArgs() {
   const args = process.argv.slice(2);
-  const params = { env: "localhost", theme: DEFAULT_THEME };
+
+  const params = {
+    env: "localhost",
+    mode: "partner",
+    theme: "light"
+  };
 
   for (const arg of args) {
     if (arg.startsWith("--connect_template=")) {
       params.connect_template = arg.split("=")[1];
-    } else if (arg.startsWith("--partner=")) {
-      params.partner = arg.split("=")[1] === "true";
+    } else if (arg.startsWith("--mode=")) {
+      params.mode = arg.split("=")[1];
     } else if (arg.startsWith("--screen=")) {
       params.screen = arg.split("=")[1];
     } else if (arg.startsWith("--device=")) {
@@ -257,7 +259,7 @@ async function compareImages(paths, approve = false) {
 (async () => {
   const {
     connect_template,
-    partner,
+    mode,
     screen: onlyScreen,
     device: onlyDevice,
     env,
@@ -273,9 +275,9 @@ async function compareImages(paths, approve = false) {
 
   const screens = onlyScreen
     ? [onlyScreen]
-    : partner
-      ? SCREENS_PARTNER_TRUE
-      : SCREENS_PARTNER_FALSE;
+    : mode === "partner"
+      ? PARTNER_SCREENS
+      : CLIENT_SCREENS;
 
   const devices = onlyDevice ? [onlyDevice] : Object.keys(DEVICE_SIZES);
 
@@ -302,7 +304,7 @@ async function compareImages(paths, approve = false) {
       const paths = getStoragePaths(connect_template, screen, device);
 
       console.log(
-        chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} / theme=${theme} (${viewport.width}x${viewport.height})`)
+        chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} / theme=${theme} / mode=${mode} (${viewport.width}x${viewport.height})`)
       );
 
       await captureScreenshot(url, paths.current, page, viewport);
