@@ -53,6 +53,7 @@ After 12 hours cookies should be removed for right the application working
 ### Optional Flags
 
 - `--screen=<screen_name>` — Run only a specific screen.
+- `--theme=<theme>` = Run on ligth or dark theme - default `light` theme
 - `--device=<device_name>` — Run only a specific device. Options:
   - `desktop` (1440x900)
   - `mobile320` (320x580)
@@ -73,10 +74,16 @@ Run all screens for a partner template:
 node visual-check.js --connect_template=partner_budgetbakers --partner=true
 ```
 
+Run on set theme:
+
+```bash
+node visual-check.js --connect_template=partner_budgetbakers --partner=true --theme=dark
+```
+
 Run only consent screen on `mobile375`:
 
 ```bash
-node visual-check.js --connect_template=partner_budgetbakers --partner=true --screen=consent --device=mobile375
+node visual-check.js --connect_template=partner_budgetbakers --partner=true --screen=consent --device=mobile360
 ```
 
 Show browser while running:

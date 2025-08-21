@@ -64,12 +64,15 @@ const ENV_URLS = {
   production: "https://www.saltedge.com"
 };
 
-const BASE_PATH = "/admin/previews/connect/frame?customization=off&locale=en&mode=all&theme=light";
+// Default theme
+const DEFAULT_THEME = "light";
+
+const BASE_PATH = "/admin/previews/connect/frame?customization=off&locale=en&mode=all";
 
 // Parse CLI arguments
 function parseArgs() {
   const args = process.argv.slice(2);
-  const params = { env: "localhost" };
+  const params = { env: "localhost", theme: DEFAULT_THEME };
 
   for (const arg of args) {
     if (arg.startsWith("--connect_template=")) {
@@ -80,6 +83,8 @@ function parseArgs() {
       params.screen = arg.split("=")[1];
     } else if (arg.startsWith("--device=")) {
       params.device = arg.split("=")[1];
+    } else if (arg.startsWith("--theme=")) {
+      params.theme = arg.split("=")[1];
     } else if (arg.startsWith("--env=")) {
       const value = arg.split("=")[1];
       if (ENV_URLS[value]) {
@@ -256,6 +261,7 @@ async function compareImages(paths, approve = false) {
     screen: onlyScreen,
     device: onlyDevice,
     env,
+    theme,
     showBrowser,
     approve,
   } = parseArgs();
@@ -292,11 +298,11 @@ async function compareImages(paths, approve = false) {
         continue;
       }
 
-      const url = `${ENV_URLS[env]}${BASE_PATH}&connect_template=${connect_template}&screen=${screen}`;
+      const url = `${ENV_URLS[env]}${BASE_PATH}&theme=${theme}&connect_template=${connect_template}&screen=${screen}`;
       const paths = getStoragePaths(connect_template, screen, device);
 
       console.log(
-        chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} (${viewport.width}x${viewport.height})`)
+        chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} / theme=${theme} (${viewport.width}x${viewport.height})`)
       );
 
       await captureScreenshot(url, paths.current, page, viewport);
