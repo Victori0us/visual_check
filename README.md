@@ -1,26 +1,77 @@
 # Visual Regression Checker
 
-This tool automates **screenshot capture** and **visual regression testing** for SaltEdge Connect templates using Puppeteer, with support for multiple environments, modes, themes, and cookie-based sessions.
+This tool automates **visual regression testing** for Salt Edge Connect flows (AIS / PIS).
+It uses **Puppeteer** for screenshots and **pixelmatch** for detecting UI changes across environments.
 
 ---
 
 ## Features
 
-- 🚀 Automated **screenshot capture** with Puppeteer.
-- 🖥️ Predefined device sizes (desktop, mobile320, mobile360, mobile414).
-- 🌐 Supports environments:
-  - localhost → http://localhost:5000
-  - staging → https://www.banksalt.com
-  - production → https://www.saltedge.com
-- 🍪 Cookies saved per environment (/cookies/{env}.json) to keep sessions alive.
-- 🎨 Theme support (--theme=light / dark).
-- 👥 Mode support: --mode=partner (default) or --mode=client.
-- 🖼️ Image diffing with pixelmatch.
-- ✅ Approval mode (--approve) to update baselines.
-- 🔍 Stops animations for consistent screenshots.
+- **Environments**:
+  - `localhost` → `http://localhost:5000`
+  - `staging` → `https://www.banksalt.com`
+  - `production` → `https://www.saltedge.com`
+
+- **Modes**:
+  - `partner` (default)
+  - `client`
+
+- **Flows**:
+  - `ais` → `/admin/previews/connect/frame`
+  - `pis` → `/admin/previews/payments_connect/frame`
+
+- **Themes**:
+  - `light` (default)
+  - `dark`
+
+- **Devices**:
+  - `desktop` (1440×900)
+  - `mobile320` (320×580)
+  - `mobile360` (360×768)
+  - `mobile414` (414×896)
+
+- **Screens**:
+  - `partner` supports extended screens (`gdpr_warning`, `override`, `confirmation`, etc.)
+  - `client` supports slightly fewer screens
+
+- **Screenshots storage structure**:
+
+```
+screenshots/
+  ais/
+    partner_default/
+      search/
+        desktop/
+          baseline.png
+          current.png
+          diff.png
+    partner_default_dark/
+      consent/
+        mobile414/
+          baseline.png
+          current.png
+          diff.png
+  pis/
+    partner_payment_default/
+      init_error/
+        mobile360/
+          baseline.png
+          current.png
+          diff.png
+```
+
+- **Cookie persistence per environment** → stored in `cookies/{env}.json` (valid ~12h).
+- **Diff logic**:
+- If no baseline → baseline is created.
+- If differences → `diff.png` highlights them.
+- If identical → `diff.png` is written with opacity `0.5` to confirm run.
+
+---
 
 
-## Installation
+### Setup
+
+1. Clone repo and install dependencies:
 
 ```bash
 git clone <repo-url>
@@ -28,19 +79,25 @@ cd visual-check
 npm install
 ```
 
----
-
-
-### Setup
-
-1. Create an `.env` file in the project root:
+2. Create `.env` file(s) in project root with credentials:
 
 ```bash
-LOGIN_USER=your_username
-LOGIN_PASS=your_password
-```
+# Localhost login
+LOCALHOST_LOGIN_USER="admin@example.com"
+LOCALHOST_LOGIN_PASS="yourpassword"
 
-2. Make sure you have a `cookies/` folder:
+# Staging login
+STAGING_LOGIN_USER="user@example.com"
+STAGING_LOGIN_PASS="yourpassword"
+
+# Production login
+PRODUCTION_LOGIN_USER="user@example.com"
+PRODUCTION_LOGIN_PASS="yourpassword"
+
+```
+⚠️ If your password contains special characters ($, &, !, etc.), wrap it in quotes.
+
+3. Make sure the `cookies/` folder exists:
 
 ```bash
 mkdir cookies
@@ -54,9 +111,9 @@ Cookies will be stored per environment (`cookies/localhost.json`, `cookies/stagi
 ---
 
 
-### Usage
+## USAGE
 
-Run the tool with:
+### Basic command
 
 ```bash
 node visual-check.js --connect_template=<template> [options]
@@ -65,44 +122,49 @@ node visual-check.js --connect_template=<template> [options]
 ---
 
 
-### Options
+### CLI Options
 
-| Option                                       | Description                                                     |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `--connect_template=...`                     | (Required) Connect template name.                               |
-| `--mode=partner` / `client`                  | Mode for testing (default: `partner`).                          |
-| `--env=localhost` / `staging` / `production` | Target environment (default: `localhost`).                      |
-| `--screen=consent`                           | Run only a specific screen (default: all screens for the mode). |
-| `--device=mobile360`                         | Run only for a specific device (default: all devices).          |
-| `--theme=dark`                               | Theme selection (default: `light`).                             |
-| `--approve`                                  | Approve changes: update baseline and reset diff.                |
-| `--show`                                     | Run Puppeteer with visible browser window.                      |
+| Option               | Description                                              | Default     |
+| -------------------- | -------------------------------------------------------- | ----------- |
+| `--connect_template` | Required. The template name (e.g., `partner_lendex`)     | —           |
+| `--screen`           | Screen to test (e.g., `init_error`, `search`)            | all screens |
+| `--mode`             | Mode: `partner`, `client`                                | `partner`   |
+| `--env`              | Environment: `localhost`, `staging`, `production`        | `localhost` |
+| `--flow`             | Flow: `ais`, `pis`                                       | `ais`       |
+| `--theme`            | Theme: `light`, `dark`                                   | `light`     |
+| `--device`           | Device: `desktop`, `mobile320`, `mobile360`, `mobile414` | all devices |
+| `--show`             | Show browser (disable headless)                          | hidden      |
+| `--approve`          | Approve current → overwrite baseline                     | false       |
+
+---
 
 
 ### Examples
 
-Run full check for `partner mode` in `localhost`:
+1. Run against **localhost**, AIS flow, partner mode:
 
 ```bash
 node visual-check.js --connect_template=partner_default_fino
 ```
 
-Run a single screen with specific device:
+2. Run against **staging**, dark theme, mobile414:
 
 ```bash
-node visual-check.js --connect_template=partner_default_fino --screen=consent --device=mobile360
+node visual-check.js --connect_template=partner_default --screen=consent --theme=dark --device=mobile414 --env=staging
 ```
 
-Run in `staging environment` with dark theme:
+Run **PIS flow** for production:
 
 ```bash
-node visual-check.js --connect_template=partner_default_fino --env=staging --theme=dark
+node visual-check.js --connect_template=partner_lendex --flow=pis  --screen=init_error --env=production
+
 ```
 
-Show browser while running:
+Show browser while debugging:
 
 ```bash
-node visual-check.js --connect_template=partner_default_fino --partner=true --show
+node visual-check.js --connect_template=partner_default_fino --screen=kyc_standard --show
+
 ```
 
 Approve new baseline after design changes:
@@ -113,41 +175,10 @@ node visual-check.js --connect_template=partner_default_fino --screen=consent --
 
 ---
 
+### Notes
 
-### Outputs
-
-Screenshots and diffs are stored under:
-
-```
-screenshots/
-  └── <connect_template>/
-      └── <screen>/
-          └── <device>/
-              ├── baseline.png   # Approved baseline
-              ├── current.png    # Latest screenshot
-              └── diff.png       # Differences
-```
-
----
-
-### Workflow
-
-1. Run the script → compares current screenshots against baseline.
-2. If differences are detected → diff.png highlights mismatches.
-3. If design changes are valid → rerun with --approve to update baselines.
-4. Cookies are reused for 12h per environment.
-
-
-### Roadmap / Ideas
-
-- Support for batch testing multiple templates.
-- Slack/GitHub Actions integration for CI pipelines.
-- Enhanced reporting (HTML/PDF summary).
-
----
-
-### Tips:
-
-- Animations are automatically disabled for consistent screenshots.
-- Screenshots are resized to match baseline if sizes differ.
+- Baselines live inside `screenshots/` and should be committed to VCS.
+- Use `--approve` when differences are **expected** and should become the new baseline.
+- Cookies are stored per environment in `cookies/ENV.json` (expire after 12h).
+- Identical screenshots still produce a `diff.png` with **opacity 0.5** (so you know it was checked).
 - Use `--screen` and `--device` to quickly test specific cases.
