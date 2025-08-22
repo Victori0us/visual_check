@@ -12,12 +12,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Predefined screens for modes
-const PARTNER_SCREENS = [
+let partner_screens = [
   "search",
   "credentials",
   "provider_and_consent_skipped",
   "consent",
-  "override",
   "stage",
   "interactive_app_redirect",
   "interactive_otp",
@@ -32,12 +31,11 @@ const PARTNER_SCREENS = [
   "kyc_standard",
 ];
 
-const CLIENT_SCREENS = [
+let client_screens = [
   "search",
   "credentials",
   "provider_and_consent_skipped",
   "consent",
-  "override",
   "stage",
   "interactive_app_redirect",
   "interactive_otp",
@@ -132,6 +130,29 @@ function getCookiePath(env) {
   return path.join(__dirname, "cookies", `${env}.json`);
 }
 
+// 🔑 Get credentials based on env
+function getCredentials(env) {
+  switch (env) {
+    case "localhost":
+      return {
+        user: process.env.LOCALHOST_LOGIN_USER,
+        pass: process.env.LOCALHOST_LOGIN_PASS,
+      };
+    case "staging":
+      return {
+        user: process.env.STAGING_LOGIN_USER,
+        pass: process.env.STAGING_LOGIN_PASS,
+      };
+    case "production":
+      return {
+        user: process.env.PRODUCTION_LOGIN_USER,
+        pass: process.env.PRODUCTION_LOGIN_PASS,
+      };
+    default:
+      throw new Error(`Unknown environment: ${env}`);
+  }
+}
+
 // Login
 async function login(page, env) {
   const cookieFile = getCookiePath(env);
@@ -144,6 +165,8 @@ async function login(page, env) {
     return;
   }
 
+  const creds = getCredentials(env);
+
   // Otherwise perform login
   const emailInput = env === "localhost" ? "#admin_email" : "#user_email"
   const passwordInput = env === "localhost" ? "#admin_password" : "#user_password"
@@ -151,8 +174,8 @@ async function login(page, env) {
 
   const loginUrl = env == "localhost" ? `${ENV_URLS[env]}/admins/sign_in/` : `${ENV_URLS[env]}/admin/dashboard`
   await page.goto(loginUrl, { waitUntil: "networkidle0" });
-  await page.type(emailInput, process.env.LOGIN_USER);
-  await page.type(passwordInput, process.env.LOGIN_PASS);
+  await page.type(emailInput, creds.user);
+  await page.type(passwordInput, creds.pass);
 
   await Promise.all([
     page.click(buttonSubmit),
@@ -276,11 +299,21 @@ async function compareImages(paths, approve = false) {
     process.exit(1);
   }
 
+  if (flow === "ais") {
+    partner_screens = [...partner_screens, "override"]
+    client_screens  = [...client_screens, "override"]
+  }
+  else {
+    if (mode === "partner") {
+      partner_screens = [...partner_screens, "confirmation"]
+    }
+  }
+
   const screens = onlyScreen
     ? [onlyScreen]
     : mode === "partner"
-      ? PARTNER_SCREENS
-      : CLIENT_SCREENS;
+      ? partner_screens
+      : client_screens;
 
   const devices = onlyDevice ? [onlyDevice] : Object.keys(DEVICE_SIZES);
 
