@@ -26,7 +26,6 @@ let partner_screens = [
   "success",
   "errors",
   "init_error",
-  "gdpr_warning",
   "kyc_simplified",
   "kyc_standard",
 ];
@@ -105,11 +104,15 @@ function parseArgs() {
 }
 
 // Storage paths
-function getStoragePaths(connectTemplate, screen, device) {
+function getStoragePaths(connectTemplate, screen, device, flow, theme) {
+  // add _dark if dark theme
+  const templateFolder = theme === "dark" ? `${connectTemplate}_dark` : connectTemplate;
+
   const baseFolder = path.join(
     __dirname,
     "screenshots",
-    connectTemplate,
+    flow,            // <- ais / pis
+    templateFolder,  // <- connect_template with optional _dark
     screen,
     device
   );
@@ -300,7 +303,7 @@ async function compareImages(paths, approve = false) {
   }
 
   if (flow === "ais") {
-    partner_screens = [...partner_screens, "override"]
+    partner_screens = [...partner_screens, "gdpr_warning", "override"]
     client_screens  = [...client_screens, "override"]
   }
   else {
@@ -337,7 +340,7 @@ async function compareImages(paths, approve = false) {
       }
 
       const url = `${ENV_URLS[env]}${BASE_PATHS[flow]}&theme=${theme}&connect_template=${connect_template}&screen=${screen}`;
-      const paths = getStoragePaths(connect_template, screen, device);
+      const paths = getStoragePaths(connect_template, screen, device, flow, theme);
 
       console.log(
         chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} / theme=${theme} / mode=${mode} / flow=${flow} (${viewport.width}x${viewport.height})`)
