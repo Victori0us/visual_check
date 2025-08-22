@@ -12,12 +12,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Predefined screens for modes
-const PARTNER_SCREENS = [
+let partner_screens = [
   "search",
   "credentials",
   "provider_and_consent_skipped",
   "consent",
-  "override",
   "stage",
   "interactive_app_redirect",
   "interactive_otp",
@@ -32,12 +31,11 @@ const PARTNER_SCREENS = [
   "kyc_standard",
 ];
 
-const CLIENT_SCREENS = [
+let client_screens = [
   "search",
   "credentials",
   "provider_and_consent_skipped",
   "consent",
-  "override",
   "stage",
   "interactive_app_redirect",
   "interactive_otp",
@@ -64,7 +62,11 @@ const ENV_URLS = {
   production: "https://www.saltedge.com"
 };
 
-const BASE_PATH = "/admin/previews/connect/frame?customization=off&locale=en";
+// Base paths per flow
+const BASE_PATHS = {
+  ais: "/admin/previews/connect/frame?customization=off&locale=en",
+  pis: "/admin/previews/payments_connect/frame?customization=off&locale=en"
+};
 
 // Parse CLI arguments
 function parseArgs() {
@@ -73,7 +75,8 @@ function parseArgs() {
   const params = {
     env: "localhost",
     mode: "partner",
-    theme: "light"
+    theme: "light",
+    flow: "ais",
   };
 
   for (const arg of args) {
@@ -87,13 +90,10 @@ function parseArgs() {
       params.device = arg.split("=")[1];
     } else if (arg.startsWith("--theme=")) {
       params.theme = arg.split("=")[1];
+    } else if (arg.startsWith("--flow=")) {
+      params.flow = arg.split("=")[1] || "ais";
     } else if (arg.startsWith("--env=")) {
-      const value = arg.split("=")[1];
-      if (ENV_URLS[value]) {
-        params.env = value;
-      } else {
-        console.warn(`⚠️ Unknown env "${value}", defaulting to localhost`);
-      }
+      params.env = arg.split("=")[1] || "localhost";
     } else if (arg === "--show") {
       params.showBrowser = true;
     } else if (arg === "--approve") {
@@ -130,6 +130,29 @@ function getCookiePath(env) {
   return path.join(__dirname, "cookies", `${env}.json`);
 }
 
+// 🔑 Get credentials based on env
+function getCredentials(env) {
+  switch (env) {
+    case "localhost":
+      return {
+        user: process.env.LOCALHOST_LOGIN_USER,
+        pass: process.env.LOCALHOST_LOGIN_PASS,
+      };
+    case "staging":
+      return {
+        user: process.env.STAGING_LOGIN_USER,
+        pass: process.env.STAGING_LOGIN_PASS,
+      };
+    case "production":
+      return {
+        user: process.env.PRODUCTION_LOGIN_USER,
+        pass: process.env.PRODUCTION_LOGIN_PASS,
+      };
+    default:
+      throw new Error(`Unknown environment: ${env}`);
+  }
+}
+
 // Login
 async function login(page, env) {
   const cookieFile = getCookiePath(env);
@@ -142,6 +165,8 @@ async function login(page, env) {
     return;
   }
 
+  const creds = getCredentials(env);
+
   // Otherwise perform login
   const emailInput = env === "localhost" ? "#admin_email" : "#user_email"
   const passwordInput = env === "localhost" ? "#admin_password" : "#user_password"
@@ -149,8 +174,8 @@ async function login(page, env) {
 
   const loginUrl = env == "localhost" ? `${ENV_URLS[env]}/admins/sign_in/` : `${ENV_URLS[env]}/admin/dashboard`
   await page.goto(loginUrl, { waitUntil: "networkidle0" });
-  await page.type(emailInput, process.env.LOGIN_USER);
-  await page.type(passwordInput, process.env.LOGIN_PASS);
+  await page.type(emailInput, creds.user);
+  await page.type(passwordInput, creds.pass);
 
   await Promise.all([
     page.click(buttonSubmit),
@@ -239,16 +264,16 @@ async function compareImages(paths, approve = false) {
   const changed = numDiffPixels > 100;
 
   if (!changed && approve) {
-    // approved mode, overwrite baseline and update diff.png with opacity 0.5
     fs.copyFileSync(paths.current, paths.baseline);
-
     const imgTransparent = new PNG({ width, height });
+
     for (let i = 0; i < img2.data.length; i += 4) {
       imgTransparent.data[i] = img2.data[i];
       imgTransparent.data[i + 1] = img2.data[i + 1];
       imgTransparent.data[i + 2] = img2.data[i + 2];
-      imgTransparent.data[i + 3] = 128; // opacity 0.5
+      imgTransparent.data[i + 3] = 128;
     }
+
     fs.writeFileSync(paths.diff, PNG.sync.write(imgTransparent));
   }
 
@@ -266,6 +291,7 @@ async function compareImages(paths, approve = false) {
     theme,
     showBrowser,
     approve,
+    flow,
   } = parseArgs();
 
   if (!connect_template) {
@@ -273,11 +299,21 @@ async function compareImages(paths, approve = false) {
     process.exit(1);
   }
 
+  if (flow === "ais") {
+    partner_screens = [...partner_screens, "override"]
+    client_screens  = [...client_screens, "override"]
+  }
+  else {
+    if (mode === "partner") {
+      partner_screens = [...partner_screens, "confirmation"]
+    }
+  }
+
   const screens = onlyScreen
     ? [onlyScreen]
     : mode === "partner"
-      ? PARTNER_SCREENS
-      : CLIENT_SCREENS;
+      ? partner_screens
+      : client_screens;
 
   const devices = onlyDevice ? [onlyDevice] : Object.keys(DEVICE_SIZES);
 
@@ -300,11 +336,11 @@ async function compareImages(paths, approve = false) {
         continue;
       }
 
-      const url = `${ENV_URLS[env]}${BASE_PATH}&theme=${theme}&connect_template=${connect_template}&screen=${screen}`;
+      const url = `${ENV_URLS[env]}${BASE_PATHS[flow]}&theme=${theme}&connect_template=${connect_template}&screen=${screen}`;
       const paths = getStoragePaths(connect_template, screen, device);
 
       console.log(
-        chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} / theme=${theme} / mode=${mode} (${viewport.width}x${viewport.height})`)
+        chalk.blue(`\n🔍 Checking: ${connect_template} / ${screen} / ${device} / theme=${theme} / mode=${mode} / flow=${flow} (${viewport.width}x${viewport.height})`)
       );
 
       await captureScreenshot(url, paths.current, page, viewport);
@@ -313,7 +349,6 @@ async function compareImages(paths, approve = false) {
         fs.copyFileSync(paths.current, paths.baseline);
         console.log(chalk.green("✅ Changes approved — baseline updated."));
 
-        // Generate a blank diff after approval
         await compareImages(paths);
         continue;
       }
